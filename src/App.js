@@ -62,7 +62,7 @@ function App() {
           }}
         />
         <button type="submit" className="button">
-          Post
+          GetPost
         </button>
       </form>
       {/* {loading ? "loading..." : ""} */}
