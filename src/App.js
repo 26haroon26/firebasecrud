@@ -117,7 +117,7 @@ function App() {
           }}
         />
         <button type="submit" className="button">
-          Post
+         GetPost
         </button>
       </form>
       <div className="body">
