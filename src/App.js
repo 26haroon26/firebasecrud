@@ -1,9 +1,20 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-// import axios from "axios";
-// import moment from "moment";
+import moment from "moment";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  query,
+  serverTimestamp,
+  updateDoc,
+  onSnapshot,
+  deleteDoc,
+  orderBy,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUnoboaWcVh3P2q9TMmc6yW8EtQC0XEuw",
@@ -21,34 +32,78 @@ const db = getFirestore(app);
 function App() {
   const [postData, setpostData] = useState("");
   const [Posts, setPosts] = useState([]);
-  // const [loading, setloading] = useState(false);
+  const [Editing, setEditing] = useState({
+    editingId: null,
+    editingText: "",
+  });
 
   useEffect(() => {
+    //  For read Data
+
     const getPostData = async () => {
       const querySnapshot = await getDocs(collection(db, "posts"));
       querySnapshot.forEach((doc) => {
-        console.log(`${doc.id} => `, doc.data());
+        // console.log(`${doc.id} => `, doc.data());
+
         setPosts((prev) => {
           let newArray = [...prev, doc.data()];
           return newArray;
         });
       });
     };
-    getPostData();
+    // getPostData();
+    
+    let unsubscribe = null;
+
+    const getRealTimeData = async () => {
+      const q = query(collection(db, "posts"), orderBy("time", "desc"));
+      unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const posts = [];
+
+        querySnapshot.forEach((doc) => {
+          // posts.unshift(doc.data()); ye bhi tariqa he descending krne ka
+          // posts.push(doc.data()); is ko naye tariqe se push kr rhe hen
+
+          posts.push({ id: doc.id, ...doc.data() });
+        });
+        setPosts(posts);
+        // console.log("posts: ", posts);
+      });
+    };
+    getRealTimeData();
+    return () => {
+      // console.log("clean: ");
+      unsubscribe();
+    };
   }, []);
 
   const SavePost = async (e) => {
     e.preventDefault();
-    console.log("postData", postData);
+    // console.log("postData", postData);
     try {
       const docRef = await addDoc(collection(db, "posts"), {
         text: postData,
-        time: new Date().getTime(),
+        time: serverTimestamp(),
       });
-      console.log("Document written with ID: ", docRef.id);
+      // console.log("Document written with ID: ", docRef.id);
     } catch (e) {
       console.error("Error adding document: ", e);
     }
+  };
+
+  const DeletePost = async (postId) => {
+    // console.log(postId);
+    await deleteDoc(doc(db, "posts", postId));
+  };
+  const UpdatePost = async (e) => {
+    e.preventDefault();
+    await updateDoc(doc(db, "posts", Editing.editingId), {
+      text: Editing.editingText,
+    });
+    setEditing({
+      editingId: null,
+      editingText: "",
+    });
   };
   return (
     <div>
@@ -62,38 +117,70 @@ function App() {
           }}
         />
         <button type="submit" className="button">
-          GetPost
+          Post
         </button>
       </form>
-      {/* {loading ? "loading..." : ""} */}
       <div className="body">
         <div className="flex">
-          {Posts.map((eachPost,i) => (
+          {Posts.map((eachPost, i) => (
             <div className="post" key={i}>
               <div className="postText">
-                {/* <a
-                  className="title"
-                  href={eachPost?.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {eachPost?.name}
-                </a>
+                <h3 className="postDescr">
+                  {eachPost.id === Editing.editingId ? (
+                    <form className="NextForm" onSubmit={UpdatePost}>
+                      <input
+                        type="text"
+                        className="input"
+                        value={Editing.editingText}
+                        onChange={(e) => {
+                          setEditing({
+                            ...Editing,
+                            editingText: e.target.value,
+                          });
+                        }}
+                        placeholder="Please Enter Updated Value"
+                      />
+                      <button type="submit" className="button next">
+                        Update
+                      </button>
+                    </form>
+                  ) : (
+                    eachPost?.text
+                  )}
+                </h3>
 
                 <span>
-                  {moment(eachPost?.datePublished).format("Do MMMM, h:mm a")}
-                </span> */}
-
-                <h3 className="postDescr">{eachPost?.text}</h3>
+                  {moment(
+                    eachPost?.time?.seconds
+                      ? eachPost?.time.seconds * 1000
+                      : undefined
+                  ).format("Do MMMM, h:mm a")}
+                </span>
+                <br />
+                <div className="NextForm">
+                  <button
+                    className="button"
+                    onClick={() => {
+                      DeletePost(eachPost?.id);
+                    }}
+                  >
+                    Delete
+                  </button>
+                  {Editing.editingId === eachPost?.id ? null : (
+                    <button
+                      className="button"
+                      onClick={() => {
+                        setEditing({
+                          editingId: eachPost?.id,
+                          editingText: eachPost?.text,
+                        });
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
               </div>
-              {/* 
-              <img
-                src={eachPost?.image?.thumbnail?.contentUrl
-                  .replace("&pid=News", "")
-                  .replace("pid=News&", "")
-                  .replace("pid=News", "")}
-                alt=""
-              /> */}
             </div>
           ))}
         </div>
