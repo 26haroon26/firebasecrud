@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import moment from "moment";
+import axios from "axios";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
   collection,
   addDoc,
-  getDocs,
   doc,
   query,
   serverTimestamp,
@@ -32,6 +32,7 @@ const db = getFirestore(app);
 function App() {
   const [postData, setpostData] = useState("");
   const [Posts, setPosts] = useState([]);
+  const [file, setfile] = useState(null);
   const [Editing, setEditing] = useState({
     editingId: null,
     editingText: "",
@@ -40,19 +41,19 @@ function App() {
   useEffect(() => {
     //  For read Data
 
-    const getPostData = async () => {
-      const querySnapshot = await getDocs(collection(db, "posts"));
-      querySnapshot.forEach((doc) => {
-        // console.log(`${doc.id} => `, doc.data());
+    // const getPostData = async () => {
+    //   const querySnapshot = await getDocs(collection(db, "posts"));
+    //   querySnapshot.forEach((doc) => {
+    //     // console.log(`${doc.id} => `, doc.data());
 
-        setPosts((prev) => {
-          let newArray = [...prev, doc.data()];
-          return newArray;
-        });
-      });
-    };
+    //     setPosts((prev) => {
+    //       let newArray = [...prev, doc.data()];
+    //       return newArray;
+    //     });
+    //   });
+    // };
     // getPostData();
-    
+
     let unsubscribe = null;
 
     const getRealTimeData = async () => {
@@ -67,7 +68,7 @@ function App() {
           posts.push({ id: doc.id, ...doc.data() });
         });
         setPosts(posts);
-        // console.log("posts: ", posts);
+        console.log("posts: ", posts);
       });
     };
     getRealTimeData();
@@ -79,16 +80,37 @@ function App() {
 
   const SavePost = async (e) => {
     e.preventDefault();
-    // console.log("postData", postData);
-    try {
-      const docRef = await addDoc(collection(db, "posts"), {
-        text: postData,
-        time: serverTimestamp(),
+    console.log("postData", postData);
+
+    const cloudinaryData = new FormData();
+    cloudinaryData.append("file", file);
+    cloudinaryData.append("upload_preset", "postPhotoFacebook");
+    cloudinaryData.append("cloud_name", "haroon123");
+    console.log("cloudinaryData", cloudinaryData);
+    axios
+      .post(
+        `https://api.cloudinary.com/v1_1/haroon123/image/upload`,
+        cloudinaryData,
+        {
+          header: {
+            "Content-Type": "multipart/from-data",
+          },
+        }
+      )
+      .then((res) => {
+        console.log("from then", res.data);
+
+        try {
+          const docRef = addDoc(collection(db, "posts"), {
+            text: postData,
+            time: serverTimestamp(),
+            img: res?.data?.url,
+          });
+          console.log("Document written with ID: ", docRef.id);
+        } catch (e) {
+          console.error("Error adding document: ", e);
+        }
       });
-      // console.log("Document written with ID: ", docRef.id);
-    } catch (e) {
-      console.error("Error adding document: ", e);
-    }
   };
 
   const DeletePost = async (postId) => {
@@ -116,8 +138,15 @@ function App() {
             setpostData(e.target.value);
           }}
         />
+        <input
+          type={"file"}
+          id="image"
+          onChange={(e) => {
+            setfile(e.currentTarget.files[0]);
+          }}
+        />
         <button type="submit" className="button">
-         GetPost
+          GetPost
         </button>
       </form>
       <div className="body">
@@ -156,6 +185,13 @@ function App() {
                       : undefined
                   ).format("Do MMMM, h:mm a")}
                 </span>
+                <img
+                  src={eachPost?.img}
+                  alt=""
+                  id="images"
+                  height={"200px"}
+                  width={"200px"}
+                />
                 <br />
                 <div className="NextForm">
                   <button
